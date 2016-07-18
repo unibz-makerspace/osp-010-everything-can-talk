@@ -55,15 +55,6 @@ The sketches have been developed for the *Arduino Uno* or *Arduino Due*. Any
 other board with an *ATmega328* compatible microcontroller might also work but
 our mileage may vary.
 
-The example sketches taken from http://www.instructables.com/id/Motion-Triggered-DSLR-Remote-System/
-do not work with the *Arduino Due*. You have been warned!
-
-### Antenna
-The radio modules used in this project transmit in the 433MHz license free
-frequency band. Therefore if an 1/4 wavelength antenna is attached to the radio
-module its length must be 173mm in the form of a straight wire soldered to the
-*ANT* pin of the module.
-
 ### Useful Links
 * https://www.arduino.cc/
 * https://www.visualstudio.com/
