@@ -1,5 +1,5 @@
 /*
- * Source code of the wireless intensity controlled light for Design
+ * Source code of the wireless intensity controlled radio for Design
  * student Federica Gasperat.
  *
  * A project in collaboration with makerspace - Faculty of Computer Science 
@@ -47,97 +47,47 @@
  * THE SOFTWARE.
  */
 
-#include <FastLED.h>
+#ifndef MCP4131_H
+#define MCP4131_H
 
-#include <ESP8266WiFi.h>
-#include <limits.h>
+#include <Arduino.h>
+#include <SPI.h>
 #include <stdint.h>
 
-/*******************************************************************************
-                       ,----.
-                      /      \
-                     | WS2811 |      
-                    _|        |
- Adafruit          |__________|
- Huzzah ESP8266       | | | |
-                  DIN | | | | DOUT
- 5, DOUT  o-----------' | | '------o
-                   VCC  | |
-                    +---' |
-                         ===
-                         GND
+namespace MCP4131_COMMANDS {
+  enum {
+    ADR_VOLATILE     = 0x00,
+    ADR_NON_VOLATILE = 0x20,
+    CMD_WRITE        = 0x00,
+    CMD_READ         = 0xC0
+  };
+}
 
-(created by AACircuit v1.28.6 beta 04/19/05 www.tech-chat.de)
-*******************************************************************************/
+template<const uint8_t ssPin>
+class MCP4131 {
 
-enum ESP8266Configuration {
-  LED_PIN = 5,
-  LED_COUNT = 7,
-  LED_VOLTAGE = 3,   // Use HUZZAH onboard 3.3V voltage regulator.
-  LED_CURRENT = 500, // Max. LED current from 3.3V regulator in mA.
-  LED_START_HUE = 0,
-  LED_HUE_CHANGE = (256 / LED_COUNT),
-  RSSI_MIN = -80, // dBm
-  RSSI_MAX = -20  // dBm
+  void write(uint8_t cmd, uint8_t data) {
+    cmd |= MCP4131_COMMANDS::CMD_WRITE;
+    SPI.beginTransaction(SPISettings(400000, MSBFIRST, SPI_MODE0));
+    digitalWrite(ssPin, LOW);
+    SPI.transfer(cmd);
+    SPI.transfer(data);
+    digitalWrite(ssPin, HIGH);
+    SPI.endTransaction();
+  }
+public:
+  MCP4131(void) {
+    pinMode(ssPin, OUTPUT);
+    digitalWrite(ssPin, HIGH);
+    SPI.begin();
+  }
+
+  void setWiper(uint8_t wiperPosition) {
+    uint8_t cmd  = 0x00;
+    uint8_t data = 0x00;
+    data = wiperPosition;
+    write((cmd | MCP4131_COMMANDS::ADR_VOLATILE), data);
+  }
 };
 
-// Return RSSI or INT_MIN.
-int32_t getRSSI() {
-  byte available_networks = WiFi.scanNetworks();
-  int rssi = INT_MIN;
-  for (int network = 0; network < available_networks; network++) {
-    int new_rssi = WiFi.RSSI(network);
-    if(rssi < new_rssi) {
-      rssi = new_rssi;
-    }
-  }
-  return rssi;
-}
-
-void blinkBuiltinLed() {
-  static bool isInitialized = false;
-  if(!isInitialized) {
-    pinMode(LED_BUILTIN, OUTPUT);
-    isInitialized = true;
-  }
-  digitalWrite(LED_BUILTIN, LOW);
-  delay(1);
-  digitalWrite(LED_BUILTIN, HIGH);
-}
-
-CRGB leds[LED_COUNT];
-
-// set light bar length from 0 to 7.
-void setLightBar(uint8_t intensity) {
-  FastLED.clear();
-  if(intensity >= LED_COUNT) {
-    intensity = LED_COUNT;
-  }
-  fill_rainbow(leds, intensity, LED_START_HUE, LED_HUE_CHANGE);
-  FastLED.show();
-}
-
-void setup() {
-  FastLED.addLeds<WS2811, LED_PIN>(leds, LED_COUNT);
-  FastLED.setCorrection(Typical8mmPixel);
-  FastLED.setTemperature(Tungsten40W);
-  FastLED.setMaxPowerInVoltsAndMilliamps(LED_VOLTAGE, LED_CURRENT);
-  fill_rainbow(leds, LED_COUNT, LED_START_HUE, LED_HUE_CHANGE);
-  FastLED.show();
-  //Serial.begin(115200);
-}
-
-void loop() {
-  int32_t rssi = getRSSI();
-  blinkBuiltinLed();
-  /*
-  Serial.print("Signal strength: ");
-  Serial.print(rssi);
-  Serial.println("dBm");
-  */
-  if(rssi != INT_MIN) {
-    //int intensity = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, LED_COUNT, 0)); // Inverted
-    int intensity = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, 0, LED_COUNT));   // Normal
-    setLightBar(intensity);
-  }
-}
+#endif

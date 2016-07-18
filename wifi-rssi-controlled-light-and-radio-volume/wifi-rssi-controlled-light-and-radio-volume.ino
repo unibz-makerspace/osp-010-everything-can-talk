@@ -1,6 +1,6 @@
 /*
- * Source code of the wireless intensity controlled light for Design
- * student Federica Gasperat.
+ * Source code of the wireless intensity controlled light & radio for
+ * Design student Federica Gasperat.
  *
  * A project in collaboration with makerspace - Faculty of Computer Science 
  * at the Free University of Bozen-Bolzano.
@@ -49,6 +49,9 @@
 
 #include <FastLED.h>
 
+#include <SPI.h>
+#include "MCP4131.h"
+
 #include <ESP8266WiFi.h>
 #include <limits.h>
 #include <stdint.h>
@@ -67,19 +70,49 @@
                          ===
                          GND
 
+ Adafruit Huzzah ESP8266
+
+ 15, CS   o-----------.
+                      |
+ 14, SCK  o---------. |
+                    | |
+             1k     | |
+             ___    | |
+ 13, MOSI o-|___|-. | |
+                  | | |
+            .---. | | |
+            |   | | | |
+           ===  o_o_o_o
+           GND |      *|
+               |MCP4131|
+               | _ _ _ | VCC
+                o o o o   +
+                | | | |   |
+                | | | '---'
+                | |===
+                | |GND
+                | |          Audio Volume
+                | '--------o to Amplifier
+                |
+                '----------o Radio Signal
+                                Input
+
 (created by AACircuit v1.28.6 beta 04/19/05 www.tech-chat.de)
 *******************************************************************************/
 
 enum ESP8266Configuration {
   LED_PIN = 5,
   LED_COUNT = 7,
+  LED_COLOR = CRGB::White,
   LED_VOLTAGE = 3,   // Use HUZZAH onboard 3.3V voltage regulator.
   LED_CURRENT = 500, // Max. LED current from 3.3V regulator in mA.
-  LED_START_HUE = 0,
-  LED_HUE_CHANGE = (256 / LED_COUNT),
+  PIN_DIGITAL_POT_CHIP_SELECT = 15,
   RSSI_MIN = -80, // dBm
-  RSSI_MAX = -20  // dBm
+  RSSI_MAX = -20, // dBm
+  RSSI_MAX_LEVEL = 8
 };
+
+MCP4131<PIN_DIGITAL_POT_CHIP_SELECT> digitalPotentiometer;
 
 // Return RSSI or INT_MIN.
 int32_t getRSSI() {
@@ -107,14 +140,23 @@ void blinkBuiltinLed() {
 
 CRGB leds[LED_COUNT];
 
-// set light bar length from 0 to 7.
-void setLightBar(uint8_t intensity) {
-  FastLED.clear();
-  if(intensity >= LED_COUNT) {
-    intensity = LED_COUNT;
+// set intensity from 0 to 7.
+void setLightIntensity(uint8_t intensity) {
+  int brightness = (1 << (intensity + 1)) - 1;
+  if (brightness > 255) {
+    brightness = 255;
   }
-  fill_rainbow(leds, intensity, LED_START_HUE, LED_HUE_CHANGE);
+  FastLED.setBrightness(brightness);
   FastLED.show();
+}
+
+// set volume from 0 to 7.
+void setRadioVolume(uint8_t volume) {
+  uint8_t wiperPosition = (1 << volume) - 1;
+  if(wiperPosition >= 127) {
+    wiperPosition = 127;
+  }
+  digitalPotentiometer.setWiper(wiperPosition);
 }
 
 void setup() {
@@ -122,8 +164,10 @@ void setup() {
   FastLED.setCorrection(Typical8mmPixel);
   FastLED.setTemperature(Tungsten40W);
   FastLED.setMaxPowerInVoltsAndMilliamps(LED_VOLTAGE, LED_CURRENT);
-  fill_rainbow(leds, LED_COUNT, LED_START_HUE, LED_HUE_CHANGE);
+  fill_solid(leds, LED_COUNT, LED_COLOR);
+  FastLED.setBrightness(100);
   FastLED.show();
+  //pinMode(LED_BUILTIN, OUTPUT);
   //Serial.begin(115200);
 }
 
@@ -136,8 +180,11 @@ void loop() {
   Serial.println("dBm");
   */
   if(rssi != INT_MIN) {
-    //int intensity = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, LED_COUNT, 0)); // Inverted
-    int intensity = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, 0, LED_COUNT));   // Normal
-    setLightBar(intensity);
+    //int intensity = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, RSSI_MAX_LEVEL, 0)); // Inverted
+    int intensity = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, 0, RSSI_MAX_LEVEL));   // Normal
+    //int volume = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, RSSI_MAX_LEVEL, 0));
+    int volume = (uint8_t)(map(rssi, RSSI_MIN, RSSI_MAX, 0, RSSI_MAX_LEVEL));
+    setLightIntensity(intensity);
+    setRadioVolume(volume);
   }
 }
